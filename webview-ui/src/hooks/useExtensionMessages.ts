@@ -49,7 +49,10 @@ function saveAgentSeats(os: OfficeState): void {
   vscode.postMessage({ type: 'saveAgentSeats', seats })
 }
 
-export function useExtensionMessages(getOfficeState: () => OfficeState): ExtensionMessageState {
+export function useExtensionMessages(
+  getOfficeState: () => OfficeState,
+  onLayoutLoaded?: (layout: OfficeLayout) => void,
+): ExtensionMessageState {
   const [agents, setAgents] = useState<number[]>([])
   const [selectedAgent, setSelectedAgent] = useState<number | null>(null)
   const [agentTools, setAgentTools] = useState<Record<number, ToolActivity[]>>({})
@@ -71,6 +74,10 @@ export function useExtensionMessages(getOfficeState: () => OfficeState): Extensi
         const layout = msg.layout as OfficeLayout | null
         if (layout && layout.version === 1) {
           os.rebuildFromLayout(layout)
+          onLayoutLoaded?.(layout)
+        } else {
+          // Default layout — snapshot whatever OfficeState built
+          onLayoutLoaded?.(os.getLayout())
         }
         // Add buffered agents now that layout (and seats) are correct
         for (const p of pendingAgents) {

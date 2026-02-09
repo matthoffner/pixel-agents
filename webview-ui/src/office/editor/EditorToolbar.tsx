@@ -58,6 +58,7 @@ interface EditorToolbarProps {
   onDeleteSelected: () => void
   onUndo: () => void
   onReset: () => void
+  onSave: () => void
   loadedAssets?: LoadedAssetData
 }
 
@@ -72,9 +73,11 @@ export function EditorToolbar({
   onDeleteSelected,
   onUndo,
   onReset,
+  onSave,
   loadedAssets,
 }: EditorToolbarProps) {
   const [activeCategory, setActiveCategory] = useState<FurnitureCategory>('desks')
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
 
   // Build dynamic catalog from loaded assets
   useEffect(() => {
@@ -151,10 +154,40 @@ export function EditorToolbar({
         <button style={btnStyle} onClick={onUndo} title="Undo (Ctrl+Z)">
           Undo
         </button>
-        <button style={btnStyle} onClick={onReset} title="Reset to default layout">
+        <button style={btnStyle} onClick={onSave} title="Save layout now">
+          Save
+        </button>
+        <button style={btnStyle} onClick={() => setShowResetConfirm(true)} title="Reset to last saved layout">
           Reset
         </button>
       </div>
+
+      {/* Reset confirmation popup */}
+      {showResetConfirm && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '4px 6px',
+          background: 'rgba(80,30,30,0.9)',
+          border: '1px solid #a44',
+          borderRadius: 4,
+        }}>
+          <span style={{ fontSize: '11px', color: '#ecc' }}>Reset to last saved layout?</span>
+          <button
+            style={{ ...btnStyle, background: '#a33', color: '#fff' }}
+            onClick={() => { setShowResetConfirm(false); onReset() }}
+          >
+            Yes
+          </button>
+          <button
+            style={btnStyle}
+            onClick={() => setShowResetConfirm(false)}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       {/* Sub-panel: Tile types */}
       {activeTool === EditTool.TILE_PAINT && (

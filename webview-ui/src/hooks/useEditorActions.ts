@@ -3,7 +3,6 @@ import type { OfficeState } from '../office/engine/officeState.js'
 import type { EditorState } from '../office/editor/editorState.js'
 import { EditTool } from '../office/types.js'
 import type { OfficeLayout, EditTool as EditToolType, TileType as TileTypeVal } from '../office/types.js'
-import { createDefaultLayout } from '../office/layout/layoutSerializer.js'
 import { paintTile, placeFurniture, removeFurniture, canPlaceFurniture } from '../office/editor/editorActions.js'
 import { getCatalogEntry } from '../office/layout/furnitureCatalog.js'
 import { defaultZoom } from '../office/toolUtils.js'
@@ -15,6 +14,7 @@ export interface EditorActions {
   zoom: number
   panRef: React.MutableRefObject<{ x: number; y: number }>
   saveTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>
+  setLastSavedLayout: (layout: OfficeLayout) => void
   handleOpenClaude: () => void
   handleToggleEditMode: () => void
   handleToolChange: (tool: EditToolType) => void
@@ -23,6 +23,7 @@ export interface EditorActions {
   handleDeleteSelected: () => void
   handleUndo: () => void
   handleReset: () => void
+  handleSave: () => void
   handleZoomChange: (zoom: number) => void
   handleEditorTileAction: (col: number, row: number) => void
 }
@@ -36,6 +37,12 @@ export function useEditorActions(
   const [zoom, setZoom] = useState(defaultZoom)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const panRef = useRef({ x: 0, y: 0 })
+  const lastSavedLayoutRef = useRef<OfficeLayout | null>(null)
+
+  // Called by useExtensionMessages on layoutLoaded to set the initial checkpoint
+  const setLastSavedLayout = useCallback((layout: OfficeLayout) => {
+    lastSavedLayoutRef.current = structuredClone(layout)
+  }, [])
 
   // Debounced layout save
   const saveLayout = useCallback((layout: OfficeLayout) => {
@@ -108,10 +115,23 @@ export function useEditorActions(
   }, [getOfficeState, editorState, saveLayout])
 
   const handleReset = useCallback(() => {
-    const defaultLayout = createDefaultLayout()
-    applyEdit(defaultLayout)
+    if (!lastSavedLayoutRef.current) return
+    const saved = structuredClone(lastSavedLayoutRef.current)
+    applyEdit(saved)
     editorState.reset()
   }, [editorState, applyEdit])
+
+  const handleSave = useCallback(() => {
+    // Flush any pending debounced save immediately
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
+    const os = getOfficeState()
+    const layout = os.getLayout()
+    lastSavedLayoutRef.current = structuredClone(layout)
+    vscode.postMessage({ type: 'saveLayout', layout })
+  }, [getOfficeState])
 
   const handleZoomChange = useCallback((newZoom: number) => {
     setZoom(Math.max(1, Math.min(10, newZoom)))
@@ -164,6 +184,7 @@ export function useEditorActions(
     zoom,
     panRef,
     saveTimerRef,
+    setLastSavedLayout,
     handleOpenClaude,
     handleToggleEditMode,
     handleToolChange,
@@ -172,6 +193,7 @@ export function useEditorActions(
     handleDeleteSelected,
     handleUndo,
     handleReset,
+    handleSave,
     handleZoomChange,
     handleEditorTileAction,
   }

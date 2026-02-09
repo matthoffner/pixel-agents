@@ -24,9 +24,9 @@ function getOfficeState(): OfficeState {
 }
 
 function App() {
-  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets } = useExtensionMessages(getOfficeState)
-
   const editor = useEditorActions(getOfficeState, editorState)
+
+  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
 
@@ -141,6 +141,7 @@ function App() {
           onDeleteSelected={editor.handleDeleteSelected}
           onUndo={editor.handleUndo}
           onReset={editor.handleReset}
+          onSave={editor.handleSave}
           loadedAssets={loadedAssets}
         />
       )}

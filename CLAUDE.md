@@ -346,13 +346,14 @@ The default layout has 2 desks (2x2 tiles each) with 4 chairs around each = 8 se
 Toggle-based edit mode for customizing the office layout:
 
 - **"Edit" button** (top-left, next to + Agent and Sessions) toggles edit mode on/off
-- **Tools**: Select, Paint, Place, Erase, Undo, Reset
+- **Tools**: Select, Paint, Place, Erase, Undo, Save, Reset
 - **Paint tool**: Click/drag to paint floor tiles (Wall, Tile Floor, Wood Floor, Carpet, Doorway)
 - **Place tool**: Click to place furniture from catalog (Desk, Bookshelf, Plant, Cooler, Whiteboard, Chair, PC, Lamp). Ghost preview shows placement validity (green/red tint).
 - **Select tool**: Click furniture to select it (dashed blue border). Press Delete to remove.
 - **Eraser tool**: Click to remove furniture at cursor position
 - **Undo** (Ctrl+Z): Reverts last edit (50-level stack)
-- **Reset**: Returns to default hardcoded office layout
+- **Save**: Flushes pending debounced save immediately and snapshots the layout as a checkpoint for Reset
+- **Reset**: Reverts to the last explicitly saved layout (with "Are you sure?" confirmation). The checkpoint is initialized from the persisted layout on load and updated each time Save is clicked.
 
 **Layout data model**: `OfficeLayout` = `{ version: 1, cols, rows, tiles: TileType[], furniture: PlacedFurniture[] }`. Flat tile array (row-major). Each `PlacedFurniture` has `uid`, `type`, `col`, `row`.
 
