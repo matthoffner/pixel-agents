@@ -1,7 +1,7 @@
 import { TILE_SIZE, CharacterState } from '../types.js'
 import type { Character, Seat, FurnitureInstance, TileType as TileTypeVal, OfficeLayout } from '../types.js'
 import { createCharacter, updateCharacter } from './characters.js'
-import { getWalkableTiles } from '../layout/tileMap.js'
+import { getWalkableTiles, findPath } from '../layout/tileMap.js'
 import {
   createDefaultLayout,
   layoutToTileMap,
@@ -44,19 +44,44 @@ export class OfficeState {
     this.furniture = layoutToFurnitureInstances(layout.furniture)
     this.walkableTiles = getWalkableTiles(this.tileMap, this.blockedTiles)
 
-    // Reassign characters to new seats
-    // First, clear all seat assignments
+    // Reassign characters to new seats, preserving existing assignments when possible
     for (const seat of this.seats.values()) {
       seat.assigned = false
     }
 
+    // First pass: try to keep characters at their existing seats
     for (const ch of this.characters.values()) {
+      if (ch.seatId && this.seats.has(ch.seatId)) {
+        const seat = this.seats.get(ch.seatId)!
+        if (!seat.assigned) {
+          seat.assigned = true
+          // Snap character to seat position
+          ch.tileCol = seat.seatCol
+          ch.tileRow = seat.seatRow
+          const cx = seat.seatCol * TILE_SIZE + TILE_SIZE / 2
+          const cy = seat.seatRow * TILE_SIZE + TILE_SIZE / 2
+          ch.x = cx
+          ch.y = cy
+          ch.dir = seat.facingDir
+          continue
+        }
+      }
+      ch.seatId = null // will be reassigned below
+    }
+
+    // Second pass: assign remaining characters to free seats
+    for (const ch of this.characters.values()) {
+      if (ch.seatId) continue
       const seatId = this.findFreeSeat()
       if (seatId) {
         this.seats.get(seatId)!.assigned = true
         ch.seatId = seatId
-      } else {
-        ch.seatId = null
+        const seat = this.seats.get(seatId)!
+        ch.tileCol = seat.seatCol
+        ch.tileRow = seat.seatRow
+        ch.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2
+        ch.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2
+        ch.dir = seat.facingDir
       }
     }
   }
@@ -72,13 +97,24 @@ export class OfficeState {
     return null
   }
 
-  addAgent(id: number): void {
+  addAgent(id: number, preferredPalette?: number, preferredSeatId?: string): void {
     if (this.characters.has(id)) return
 
-    const palette = this.nextPalette % 6
-    this.nextPalette++
+    const palette = preferredPalette ?? (this.nextPalette % 6)
+    this.nextPalette = Math.max(this.nextPalette, palette + 1)
 
-    const seatId = this.findFreeSeat()
+    // Try preferred seat first, then any free seat
+    let seatId: string | null = null
+    if (preferredSeatId && this.seats.has(preferredSeatId)) {
+      const seat = this.seats.get(preferredSeatId)!
+      if (!seat.assigned) {
+        seatId = preferredSeatId
+      }
+    }
+    if (!seatId) {
+      seatId = this.findFreeSeat()
+    }
+
     if (seatId) {
       const seat = this.seats.get(seatId)!
       seat.assigned = true
@@ -131,11 +167,48 @@ export class OfficeState {
     if (!seat || seat.assigned) return
     seat.assigned = true
     ch.seatId = seatId
-    // Kick out of TYPE/IDLE state so character walks to new seat
-    if (ch.state === CharacterState.TYPE || ch.state === CharacterState.IDLE) {
-      ch.state = CharacterState.IDLE
+    // Pathfind to new seat immediately
+    const path = findPath(ch.tileCol, ch.tileRow, seat.seatCol, seat.seatRow, this.tileMap, this.blockedTiles)
+    if (path.length > 0) {
+      ch.path = path
+      ch.moveProgress = 0
+      ch.state = CharacterState.WALK
       ch.frame = 0
       ch.frameTimer = 0
+    } else {
+      // Already at seat or no path — sit down
+      ch.state = CharacterState.TYPE
+      ch.dir = seat.facingDir
+      ch.frame = 0
+      ch.frameTimer = 0
+      if (!ch.isActive) {
+        ch.seatTimer = 3.0 + Math.random() * 2.0
+      }
+    }
+  }
+
+  /** Send an agent back to their currently assigned seat */
+  sendToSeat(agentId: number): void {
+    const ch = this.characters.get(agentId)
+    if (!ch || !ch.seatId) return
+    const seat = this.seats.get(ch.seatId)
+    if (!seat) return
+    const path = findPath(ch.tileCol, ch.tileRow, seat.seatCol, seat.seatRow, this.tileMap, this.blockedTiles)
+    if (path.length > 0) {
+      ch.path = path
+      ch.moveProgress = 0
+      ch.state = CharacterState.WALK
+      ch.frame = 0
+      ch.frameTimer = 0
+    } else {
+      // Already at seat — sit down
+      ch.state = CharacterState.TYPE
+      ch.dir = seat.facingDir
+      ch.frame = 0
+      ch.frameTimer = 0
+      if (!ch.isActive) {
+        ch.seatTimer = 3.0 + Math.random() * 2.0
+      }
     }
   }
 
@@ -153,9 +226,55 @@ export class OfficeState {
     }
   }
 
+  showPermissionBubble(id: number): void {
+    const ch = this.characters.get(id)
+    if (ch) {
+      ch.bubbleType = 'permission'
+      ch.bubbleTimer = 0
+    }
+  }
+
+  clearPermissionBubble(id: number): void {
+    const ch = this.characters.get(id)
+    if (ch && ch.bubbleType === 'permission') {
+      ch.bubbleType = null
+      ch.bubbleTimer = 0
+    }
+  }
+
+  showWaitingBubble(id: number): void {
+    const ch = this.characters.get(id)
+    if (ch) {
+      ch.bubbleType = 'waiting'
+      ch.bubbleTimer = 2.0
+    }
+  }
+
+  /** Dismiss bubble on click — permission: instant, waiting: quick fade */
+  dismissBubble(id: number): void {
+    const ch = this.characters.get(id)
+    if (!ch || !ch.bubbleType) return
+    if (ch.bubbleType === 'permission') {
+      ch.bubbleType = null
+      ch.bubbleTimer = 0
+    } else if (ch.bubbleType === 'waiting') {
+      // Trigger immediate fade (0.3s remaining)
+      ch.bubbleTimer = Math.min(ch.bubbleTimer, 0.3)
+    }
+  }
+
   update(dt: number): void {
     for (const ch of this.characters.values()) {
       updateCharacter(ch, dt, this.walkableTiles, this.seats, this.tileMap, this.blockedTiles)
+
+      // Tick bubble timer for waiting bubbles
+      if (ch.bubbleType === 'waiting') {
+        ch.bubbleTimer -= dt
+        if (ch.bubbleTimer <= 0) {
+          ch.bubbleType = null
+          ch.bubbleTimer = 0
+        }
+      }
     }
   }
 

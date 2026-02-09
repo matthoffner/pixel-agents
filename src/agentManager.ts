@@ -248,6 +248,7 @@ export function restoreAgents(
 
 export function sendExistingAgents(
 	agents: Map<number, AgentState>,
+	context: vscode.ExtensionContext,
 	webview: vscode.Webview | undefined,
 ): void {
 	if (!webview) return;
@@ -256,9 +257,15 @@ export function sendExistingAgents(
 		agentIds.push(id);
 	}
 	agentIds.sort((a, b) => a - b);
+
+	// Include persisted palette/seatId from separate key
+	const agentMeta = context.workspaceState.get<Record<string, { palette?: number; seatId?: string }>>('arcadia.agentSeats', {});
+	console.log(`[Arcadia] sendExistingAgents: agents=${JSON.stringify(agentIds)}, meta=${JSON.stringify(agentMeta)}`);
+
 	webview.postMessage({
 		type: 'existingAgents',
 		agents: agentIds,
+		agentMeta,
 	});
 
 	sendCurrentAgentStatuses(agents, webview);

@@ -67,6 +67,10 @@ export class ArcadiaViewProvider implements vscode.WebviewViewProvider {
 				if (agent) {
 					agent.terminalRef.dispose();
 				}
+			} else if (message.type === 'saveAgentSeats') {
+				// Store seat assignments in a separate key (never touched by persistAgents)
+				console.log(`[Arcadia] saveAgentSeats:`, JSON.stringify(message.seats));
+				this.context.workspaceState.update('arcadia.agentSeats', message.seats);
 			} else if (message.type === 'saveLayout') {
 				this.context.workspaceState.update('arcadia.layout', message.layout);
 			} else if (message.type === 'webviewReady') {
@@ -78,7 +82,7 @@ export class ArcadiaViewProvider implements vscode.WebviewViewProvider {
 					this.jsonlPollTimers, this.projectScanTimer, this.activeAgentId,
 					this.webview, this.persistAgents,
 				);
-				sendExistingAgents(this.agents, this.webview);
+				sendExistingAgents(this.agents, this.context, this.webview);
 				sendLayout(this.context, this.webview);
 			} else if (message.type === 'openSessionsFolder') {
 				const projectDir = getProjectDirPath();

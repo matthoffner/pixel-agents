@@ -271,6 +271,52 @@ export const LAMP_SPRITE: SpriteData = (() => {
   ]
 })()
 
+// ── Speech Bubble Sprites ───────────────────────────────────────
+
+/** Permission bubble: white square with "..." in amber, and a tail pointer (11x13) */
+export const BUBBLE_PERMISSION_SPRITE: SpriteData = (() => {
+  const B = '#555566' // border
+  const F = '#EEEEFF' // fill
+  const A = '#CCA700' // amber dots
+  return [
+    [B, B, B, B, B, B, B, B, B, B, B],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [B, F, F, A, F, A, F, A, F, F, B],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [B, B, B, B, B, B, B, B, B, B, B],
+    [_, _, _, _, B, B, B, _, _, _, _],
+    [_, _, _, _, _, B, _, _, _, _, _],
+    [_, _, _, _, _, _, _, _, _, _, _],
+  ]
+})()
+
+/** Waiting bubble: white square with green checkmark, and a tail pointer (11x13) */
+export const BUBBLE_WAITING_SPRITE: SpriteData = (() => {
+  const B = '#555566' // border
+  const F = '#EEEEFF' // fill
+  const G = '#44BB66' // green check
+  return [
+    [_, B, B, B, B, B, B, B, B, B, _],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [B, F, F, F, F, F, F, F, G, F, B],
+    [B, F, F, F, F, F, F, G, F, F, B],
+    [B, F, F, G, F, F, G, F, F, F, B],
+    [B, F, F, F, G, G, F, F, F, F, B],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [B, F, F, F, F, F, F, F, F, F, B],
+    [_, B, B, B, B, B, B, B, B, B, _],
+    [_, _, _, _, B, B, B, _, _, _, _],
+    [_, _, _, _, _, B, _, _, _, _, _],
+    [_, _, _, _, _, _, _, _, _, _, _],
+  ]
+})()
+
 // ── Character Sprites ───────────────────────────────────────────
 // 16x24 characters with palette substitution
 

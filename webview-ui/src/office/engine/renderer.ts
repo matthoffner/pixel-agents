@@ -1,7 +1,7 @@
 import { TileType, TILE_SIZE, MAP_COLS, MAP_ROWS } from '../types.js'
 import type { TileType as TileTypeVal, FurnitureInstance, Character, SpriteData, Seat } from '../types.js'
 import { getCachedSprite, getOutlineSprite } from '../sprites/spriteCache.js'
-import { getCharacterSprites } from '../sprites/spriteData.js'
+import { getCharacterSprites, BUBBLE_PERMISSION_SPRITE, BUBBLE_WAITING_SPRITE } from '../sprites/spriteData.js'
 import { getCharacterSprite } from './characters.js'
 
 // ── Tile colors ─────────────────────────────────────────────────
@@ -234,6 +234,44 @@ export function renderSelectionHighlight(
   ctx.restore()
 }
 
+// ── Speech bubbles ──────────────────────────────────────────────
+
+const BUBBLE_FADE_DURATION = 0.5
+
+export function renderBubbles(
+  ctx: CanvasRenderingContext2D,
+  characters: Character[],
+  offsetX: number,
+  offsetY: number,
+  zoom: number,
+): void {
+  for (const ch of characters) {
+    if (!ch.bubbleType) continue
+
+    const sprite = ch.bubbleType === 'permission'
+      ? BUBBLE_PERMISSION_SPRITE
+      : BUBBLE_WAITING_SPRITE
+
+    // Compute opacity: permission = full, waiting = fade in last 0.5s
+    let alpha = 1.0
+    if (ch.bubbleType === 'waiting' && ch.bubbleTimer < BUBBLE_FADE_DURATION) {
+      alpha = ch.bubbleTimer / BUBBLE_FADE_DURATION
+    }
+
+    const cached = getCachedSprite(sprite, zoom)
+    // Position: centered above the character's head
+    // Character is anchored bottom-center at (ch.x, ch.y), sprite is 16x24
+    // Place bubble above head with a small gap
+    const bubbleX = Math.round(offsetX + ch.x * zoom - cached.width / 2)
+    const bubbleY = Math.round(offsetY + (ch.y - 24) * zoom - cached.height - 1 * zoom)
+
+    ctx.save()
+    if (alpha < 1.0) ctx.globalAlpha = alpha
+    ctx.drawImage(cached, bubbleX, bubbleY)
+    ctx.restore()
+  }
+}
+
 export interface EditorRenderState {
   showGrid: boolean
   ghostSprite: SpriteData | null
@@ -289,6 +327,9 @@ export function renderFrame(
   const selectedId = selection?.selectedAgentId ?? null
   const hoveredId = selection?.hoveredAgentId ?? null
   renderScene(ctx, furniture, characters, offsetX, offsetY, zoom, selectedId, hoveredId)
+
+  // Speech bubbles (always on top of characters)
+  renderBubbles(ctx, characters, offsetX, offsetY, zoom)
 
   // Editor overlays
   if (editor) {

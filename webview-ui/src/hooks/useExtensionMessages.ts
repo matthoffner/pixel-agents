@@ -12,6 +12,14 @@ export interface ExtensionMessageState {
   layoutReady: boolean
 }
 
+function saveAgentSeats(os: OfficeState): void {
+  const seats: Record<number, { palette: number; seatId: string | null }> = {}
+  for (const ch of os.characters.values()) {
+    seats[ch.id] = { palette: ch.palette, seatId: ch.seatId }
+  }
+  vscode.postMessage({ type: 'saveAgentSeats', seats })
+}
+
 export function useExtensionMessages(getOfficeState: () => OfficeState): ExtensionMessageState {
   const [agents, setAgents] = useState<number[]>([])
   const [, setSelectedAgent] = useState<number | null>(null)
@@ -21,6 +29,9 @@ export function useExtensionMessages(getOfficeState: () => OfficeState): Extensi
   const [layoutReady, setLayoutReady] = useState(false)
 
   useEffect(() => {
+    // Buffer agents from existingAgents until layout is loaded
+    let pendingAgents: Array<{ id: number; palette?: number; seatId?: string }> = []
+
     const handler = (e: MessageEvent) => {
       const msg = e.data
       const os = getOfficeState()
@@ -30,12 +41,21 @@ export function useExtensionMessages(getOfficeState: () => OfficeState): Extensi
         if (layout && layout.version === 1) {
           os.rebuildFromLayout(layout)
         }
+        // Add buffered agents now that layout (and seats) are correct
+        for (const p of pendingAgents) {
+          os.addAgent(p.id, p.palette, p.seatId)
+        }
+        pendingAgents = []
         setLayoutReady(true)
+        if (os.characters.size > 0) {
+          saveAgentSeats(os)
+        }
       } else if (msg.type === 'agentCreated') {
         const id = msg.id as number
         setAgents((prev) => (prev.includes(id) ? prev : [...prev, id]))
         setSelectedAgent(id)
         os.addAgent(id)
+        saveAgentSeats(os)
       } else if (msg.type === 'agentClosed') {
         const id = msg.id as number
         setAgents((prev) => prev.filter((a) => a !== id))
@@ -61,13 +81,18 @@ export function useExtensionMessages(getOfficeState: () => OfficeState): Extensi
         os.removeAgent(id)
       } else if (msg.type === 'existingAgents') {
         const incoming = msg.agents as number[]
+        const meta = (msg.agentMeta || {}) as Record<number, { palette?: number; seatId?: string }>
+        // Buffer agents — they'll be added in layoutLoaded after seats are built
+        for (const id of incoming) {
+          const m = meta[id]
+          pendingAgents.push({ id, palette: m?.palette, seatId: m?.seatId })
+        }
         setAgents((prev) => {
           const ids = new Set(prev)
           const merged = [...prev]
           for (const id of incoming) {
             if (!ids.has(id)) {
               merged.push(id)
-              os.addAgent(id)
             }
           }
           return merged.sort((a, b) => a - b)
@@ -84,6 +109,7 @@ export function useExtensionMessages(getOfficeState: () => OfficeState): Extensi
         const toolName = extractToolName(status)
         os.setAgentTool(id, toolName)
         os.setAgentActive(id, true)
+        os.clearPermissionBubble(id)
       } else if (msg.type === 'agentToolDone') {
         const id = msg.id as number
         const toolId = msg.toolId as string
@@ -110,6 +136,7 @@ export function useExtensionMessages(getOfficeState: () => OfficeState): Extensi
           return next
         })
         os.setAgentTool(id, null)
+        os.clearPermissionBubble(id)
       } else if (msg.type === 'agentSelected') {
         const id = msg.id as number
         setSelectedAgent(id)
@@ -126,6 +153,9 @@ export function useExtensionMessages(getOfficeState: () => OfficeState): Extensi
           return { ...prev, [id]: status }
         })
         os.setAgentActive(id, status === 'active')
+        if (status === 'waiting') {
+          os.showWaitingBubble(id)
+        }
       } else if (msg.type === 'agentToolPermission') {
         const id = msg.id as number
         setAgentTools((prev) => {
@@ -136,6 +166,7 @@ export function useExtensionMessages(getOfficeState: () => OfficeState): Extensi
             [id]: list.map((t) => (t.done ? t : { ...t, permissionWait: true })),
           }
         })
+        os.showPermissionBubble(id)
       } else if (msg.type === 'agentToolPermissionClear') {
         const id = msg.id as number
         setAgentTools((prev) => {
@@ -148,6 +179,7 @@ export function useExtensionMessages(getOfficeState: () => OfficeState): Extensi
             [id]: list.map((t) => (t.permissionWait ? { ...t, permissionWait: false } : t)),
           }
         })
+        os.clearPermissionBubble(id)
       } else if (msg.type === 'subagentToolStart') {
         const id = msg.id as number
         const parentToolId = msg.parentToolId as string

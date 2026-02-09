@@ -9,6 +9,8 @@ const WALK_FRAME_DURATION = 0.15
 const TYPE_FRAME_DURATION = 0.3
 const WANDER_PAUSE_MIN = 2.0
 const WANDER_PAUSE_MAX = 5.0
+const SEAT_SIT_MIN = 3.0
+const SEAT_SIT_MAX = 5.0
 
 /** Tools that show reading animation instead of typing */
 const READING_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch'])
@@ -62,6 +64,9 @@ export function createCharacter(
     wanderTimer: 0,
     isActive: true,
     seatId,
+    bubbleType: null,
+    bubbleTimer: 0,
+    seatTimer: 0,
   }
 }
 
@@ -81,8 +86,12 @@ export function updateCharacter(
         ch.frameTimer -= TYPE_FRAME_DURATION
         ch.frame = (ch.frame + 1) % 2
       }
-      // If no longer active, stand up and start wandering
+      // If no longer active, stand up and start wandering (after seatTimer expires)
       if (!ch.isActive) {
+        if (ch.seatTimer > 0) {
+          ch.seatTimer -= dt
+          break
+        }
         ch.state = CharacterState.IDLE
         ch.frame = 0
         ch.frameTimer = 0
@@ -170,6 +179,18 @@ export function updateCharacter(
             }
           }
         } else {
+          // Check if arrived at assigned seat — sit down temporarily before wandering
+          if (ch.seatId) {
+            const seat = seats.get(ch.seatId)
+            if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
+              ch.state = CharacterState.TYPE
+              ch.dir = seat.facingDir
+              ch.seatTimer = randomRange(SEAT_SIT_MIN, SEAT_SIT_MAX)
+              ch.frame = 0
+              ch.frameTimer = 0
+              break
+            }
+          }
           ch.state = CharacterState.IDLE
           ch.wanderTimer = randomRange(WANDER_PAUSE_MIN, WANDER_PAUSE_MAX)
         }

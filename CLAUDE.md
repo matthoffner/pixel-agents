@@ -27,6 +27,8 @@ VS Code extension with an embedded React webview panel.
 │   │   │   └── AgentLabels.tsx         — Name labels + status dots above characters
 │   │   └── office/           — Pixel art office UI (see "Office UI" section below)
 │   └── vite.config.ts        — Builds to ../dist/webview with relative base paths
+├── scripts/
+│   └── export-sprites.ts     — Exports all pixel art sprites to PNG files (furniture + character sheets)
 ├── esbuild.js                — Bundles the extension (src/) → dist/extension.js
 ├── dist/                     — Build output (gitignored)
 │   ├── extension.js          — Bundled extension
@@ -98,7 +100,7 @@ Real-time display of what each Claude Code agent is doing (e.g., "Reading App.ts
    - `agentToolDone { id, toolId }` — when a matching tool_result block is found (300ms delayed)
    - `agentToolsClear { id }` — when a new user prompt is detected (clears stacked tools)
    - `agentStatus { id, status: 'waiting' | 'active' }` — when agent finishes turn or starts new work
-   - `existingAgents { agents: number[] }` — sent on webview reconnect
+   - `existingAgents { agents: number[], agentMeta }` — sent on webview reconnect, includes palette/seatId per agent
 7. **Webview rendering**: Top-down pixel art office scene (Gather.town style). Each agent is an animated character at a desk. Tool status appears as hover tooltips over characters. "+" Agent and "Sessions" buttons float in the top-left corner. See "Office UI" section for full details.
 
 ### Key lessons learned
@@ -134,7 +136,7 @@ pollingTimers        — agentId → setInterval (2s backup file polling)
 waitingTimers        — agentId → setTimeout (2s debounce for "waiting" status)
 ```
 
-**Persistence**: Agent-to-terminal mappings are persisted to `workspaceState` (key `'arcadia.agents'`) as `PersistedAgent[]`. Office layout is persisted to `workspaceState` (key `'arcadia.layout'`). On webview ready, `restoreAgents()` reads persisted state, matches each entry to a live terminal by name, and recreates the `AgentState`. File watching resumes from end-of-file (no replay). Entries whose terminals no longer exist are pruned. `nextAgentId` and `nextTerminalIndex` are advanced past restored values to avoid collisions. `sendLayout()` sends the persisted layout (or null for default) to the webview.
+**Persistence**: Agent-to-terminal mappings are persisted to `workspaceState` (key `'arcadia.agents'`) as `PersistedAgent[]` (includes `palette?` and `seatId?` for position restore). Office layout is persisted to `workspaceState` (key `'arcadia.layout'`). On webview ready, `restoreAgents()` reads persisted state, matches each entry to a live terminal by name, and recreates the `AgentState`. `sendExistingAgents()` includes `agentMeta` with palette/seatId so characters restore to their assigned seats. `rebuildFromLayout()` preserves existing seat assignments when possible (first pass keeps valid seats, second pass assigns remaining to free seats). The webview sends `saveAgentSeats` back to the extension whenever agents are created, seats reassigned, or layout rebuilt. File watching resumes from end-of-file (no replay). Entries whose terminals no longer exist are pruned. `nextAgentId` and `nextTerminalIndex` are advanced past restored values to avoid collisions. `sendLayout()` sends the persisted layout (or null for default) to the webview.
 
 ## Office UI (Pixel Art Scene)
 
@@ -214,9 +216,21 @@ Keyboard       → useEditorKeyboard hook → delegates to useEditorActions call
 ### Character behavior
 
 - **Active (working)**: Character pathfinds (BFS) to assigned chair tile, sits down facing the desk, plays typing or reading animation depending on the active tool. Triggered by `agentToolStart` or `agentStatus: 'active'`.
-- **Idle (waiting)**: Character stands up from desk, wanders to random walkable tiles via BFS pathfinding with 2-5s pauses between moves. Triggered by `agentStatus: 'waiting'`. Walk animation has 4 frames per direction.
+- **Idle (waiting)**: Character sits briefly at desk (3-5s via `seatTimer`), then stands up and wanders to random walkable tiles via BFS pathfinding with 2-5s pauses between moves. Periodically returns to seat to sit briefly before wandering again. Triggered by `agentStatus: 'waiting'`. Walk animation has 4 frames per direction.
 - **Created**: Spawns at desk in typing state (assumes new agents are immediately active).
 - **Removed**: Character disappears, seat freed for next agent.
+
+### Speech bubbles
+
+Pixel art speech bubbles appear above agents to indicate status:
+
+- **Permission bubble ("...")**: White square bubble with 3 amber dots. Shown when `agentToolPermission` fires. Stays until:
+  - Agent is clicked (instant dismiss)
+  - `agentToolPermissionClear` fires
+  - New tool starts or tools cleared
+- **Waiting bubble (checkmark)**: White square bubble with green checkmark. Shown when `agentStatus: 'waiting'` fires. Auto-fades after 2s (1.5s full opacity + 0.5s fade). Immediately starts fading when agent is clicked.
+
+**Implementation**: Bubble state (`bubbleType`, `bubbleTimer`) lives on the `Character` struct. `OfficeState.update()` ticks waiting timers. `renderBubbles()` draws sprites above characters after the z-sorted scene (always on top). Sprites defined in `spriteData.ts` (`BUBBLE_PERMISSION_SPRITE`, `BUBBLE_WAITING_SPRITE`), 11x13 pixels each.
 
 ### Movement system
 
@@ -246,7 +260,7 @@ The default layout has 2 desks (2x2 tiles each) with 4 chairs around each = 8 se
 
 **Seat fields**: `uid` (chair furniture uid), `seatCol`, `seatRow` (tile where agent sits), `facingDir` (toward desk), `assigned` (boolean).
 
-**Agent selection + seat reassignment**: Click a character to select it (white pixel-perfect outline glow). Seat indicators appear: blue overlay on current seat, green pulsing overlay on available (unassigned) seats. Click an available seat to reassign the agent — they walk to their new seat. Click empty space or the same agent again to deselect. Selection clears automatically when an agent is removed.
+**Agent selection + seat reassignment**: Click a character to select it (white pixel-perfect outline glow). Seat indicators appear: blue overlay on current seat, green pulsing overlay on available (unassigned) seats. Click an available seat to reassign the agent — they pathfind to their new seat immediately. Click the agent's own seat to send them back to it. Click empty space or the same agent again to deselect. Selection clears automatically when an agent is removed.
 
 ### Office Layout Editor
 

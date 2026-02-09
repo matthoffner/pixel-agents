@@ -7,6 +7,7 @@ import { renderFrame } from '../engine/renderer.js'
 import { TILE_SIZE, MAP_COLS, MAP_ROWS, EditTool } from '../types.js'
 import { getCatalogEntry } from '../layout/furnitureCatalog.js'
 import { canPlaceFurniture } from '../editor/editorActions.js'
+import { vscode } from '../../vscodeApi.js'
 
 interface OfficeCanvasProps {
   officeState: OfficeState
@@ -245,8 +246,11 @@ export function OfficeCanvas({ officeState, onHover, onClick, isEditMode, editor
           const seatId = officeState.getSeatAtTile(tile.col, tile.row)
           if (seatId) {
             const seat = officeState.seats.get(seatId)
-            if (seat && !seat.assigned) {
-              cursor = 'pointer'
+            if (seat) {
+              const selectedCh = officeState.characters.get(officeState.selectedAgentId)
+              if (!seat.assigned || (selectedCh && selectedCh.seatId === seatId)) {
+                cursor = 'pointer'
+              }
             }
           }
         }
@@ -311,6 +315,8 @@ export function OfficeCanvas({ officeState, onHover, onClick, isEditMode, editor
 
       const hitId = officeState.getCharacterAt(pos.worldX, pos.worldY)
       if (hitId !== null) {
+        // Dismiss any active bubble on click
+        officeState.dismissBubble(hitId)
         // Toggle selection: click same agent deselects, different agent selects
         if (officeState.selectedAgentId === hitId) {
           officeState.selectedAgentId = null
@@ -327,11 +333,26 @@ export function OfficeCanvas({ officeState, onHover, onClick, isEditMode, editor
         if (tile) {
           const seatId = officeState.getSeatAtTile(tile.col, tile.row)
           if (seatId) {
+            const selectedCh = officeState.characters.get(officeState.selectedAgentId)
             const seat = officeState.seats.get(seatId)
-            if (seat && !seat.assigned) {
-              officeState.reassignSeat(officeState.selectedAgentId, seatId)
-              officeState.selectedAgentId = null
-              return
+            if (seat && selectedCh) {
+              if (selectedCh.seatId === seatId) {
+                // Clicked own seat — send agent back to it
+                officeState.sendToSeat(officeState.selectedAgentId)
+                officeState.selectedAgentId = null
+                return
+              } else if (!seat.assigned) {
+                // Clicked available seat — reassign
+                officeState.reassignSeat(officeState.selectedAgentId, seatId)
+                officeState.selectedAgentId = null
+                // Persist seat assignments
+                const seats: Record<number, { palette: number; seatId: string | null }> = {}
+                for (const ch of officeState.characters.values()) {
+                  seats[ch.id] = { palette: ch.palette, seatId: ch.seatId }
+                }
+                vscode.postMessage({ type: 'saveAgentSeats', seats })
+                return
+              }
             }
           }
         }
