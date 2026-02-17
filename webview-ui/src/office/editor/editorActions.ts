@@ -112,17 +112,16 @@ export function canPlaceFurniture(
   for (let dr = 0; dr < entry.footprintH; dr++) {
     if (dr < bgRows) continue
     if (row + dr < 0) continue // row above map (wall items extending upward)
+    // Wall items: only the bottom row must be on wall tiles; upper rows can overlap VOID/anything
+    if (entry.canPlaceOnWalls && dr < entry.footprintH - 1) continue
     for (let dc = 0; dc < entry.footprintW; dc++) {
       const idx = (row + dr) * layout.cols + (col + dc)
       const tileVal = layout.tiles[idx]
-      if (tileVal === TileType.VOID) return false // Cannot place on VOID
-      const isWall = tileVal === TileType.WALL
       if (entry.canPlaceOnWalls) {
-        // Wall items: only the bottom row must be on wall tiles
-        if (dr === entry.footprintH - 1 && !isWall) return false
+        if (tileVal !== TileType.WALL) return false
       } else {
-        // Normal items cannot overlap walls
-        if (isWall) return false
+        if (tileVal === TileType.VOID) return false // Cannot place on VOID
+        if (tileVal === TileType.WALL) return false // Normal items cannot overlap walls
       }
     }
   }
