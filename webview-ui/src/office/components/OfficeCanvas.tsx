@@ -5,7 +5,7 @@ import type { EditorRenderState, SelectionRenderState, DeleteButtonBounds, Rotat
 import { startGameLoop } from '../engine/gameLoop.js'
 import { renderFrame } from '../engine/renderer.js'
 import { TILE_SIZE, EditTool } from '../types.js'
-import { CAMERA_FOLLOW_LERP, CAMERA_FOLLOW_SNAP_THRESHOLD, ZOOM_MIN, ZOOM_MAX, ZOOM_SCROLL_THRESHOLD } from '../../constants.js'
+import { CAMERA_FOLLOW_LERP, CAMERA_FOLLOW_SNAP_THRESHOLD, ZOOM_MIN, ZOOM_MAX, ZOOM_SCROLL_THRESHOLD, PAN_MARGIN_FRACTION } from '../../constants.js'
 import { getCatalogEntry, isRotatable } from '../layout/furnitureCatalog.js'
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js'
 import { vscode } from '../../vscodeApi.js'
@@ -42,6 +42,23 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   const isEraseDraggingRef = useRef(false)
   // Zoom scroll accumulator for trackpad pinch sensitivity
   const zoomAccumulatorRef = useRef(0)
+
+  // Clamp pan so the map edge can't go past a margin inside the viewport
+  const clampPan = useCallback((px: number, py: number): { x: number; y: number } => {
+    const canvas = canvasRef.current
+    if (!canvas) return { x: px, y: py }
+    const layout = officeState.getLayout()
+    const mapW = layout.cols * TILE_SIZE * zoom
+    const mapH = layout.rows * TILE_SIZE * zoom
+    const marginX = canvas.width * PAN_MARGIN_FRACTION
+    const marginY = canvas.height * PAN_MARGIN_FRACTION
+    const maxPanX = (mapW / 2) + canvas.width / 2 - marginX
+    const maxPanY = (mapH / 2) + canvas.height / 2 - marginY
+    return {
+      x: Math.max(-maxPanX, Math.min(maxPanX, px)),
+      y: Math.max(-maxPanY, Math.min(maxPanY, py)),
+    }
+  }, [officeState, zoom])
 
   // Resize canvas backing store to device pixels (no DPR transform on ctx)
   const resizeCanvas = useCallback(() => {
@@ -280,10 +297,10 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         const dpr = window.devicePixelRatio || 1
         const dx = (e.clientX - panStartRef.current.mouseX) * dpr
         const dy = (e.clientY - panStartRef.current.mouseY) * dpr
-        panRef.current = {
-          x: panStartRef.current.panX + dx,
-          y: panStartRef.current.panY + dy,
-        }
+        panRef.current = clampPan(
+          panStartRef.current.panX + dx,
+          panStartRef.current.panY + dy,
+        )
         return
       }
 
@@ -378,7 +395,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
       }
       officeState.hoveredAgentId = hitId
     },
-    [officeState, screenToWorld, screenToTile, isEditMode, editorState, onEditorTileAction, onEditorEraseAction, panRef, hitTestDeleteButton, hitTestRotateButton],
+    [officeState, screenToWorld, screenToTile, isEditMode, editorState, onEditorTileAction, onEditorEraseAction, panRef, hitTestDeleteButton, hitTestRotateButton, clampPan],
   )
 
   const handleMouseDown = useCallback(
@@ -625,13 +642,13 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
         // Pan via trackpad two-finger scroll or mouse wheel
         const dpr = window.devicePixelRatio || 1
         officeState.cameraFollowId = null
-        panRef.current = {
-          x: panRef.current.x - e.deltaX * dpr,
-          y: panRef.current.y - e.deltaY * dpr,
-        }
+        panRef.current = clampPan(
+          panRef.current.x - e.deltaX * dpr,
+          panRef.current.y - e.deltaY * dpr,
+        )
       }
     },
-    [zoom, onZoomChange, officeState, panRef],
+    [zoom, onZoomChange, officeState, panRef, clampPan],
   )
 
   // Prevent default middle-click browser behavior (auto-scroll)
