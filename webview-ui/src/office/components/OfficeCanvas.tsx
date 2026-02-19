@@ -5,7 +5,7 @@ import type { EditorRenderState, SelectionRenderState, DeleteButtonBounds, Rotat
 import { startGameLoop } from '../engine/gameLoop.js'
 import { renderFrame } from '../engine/renderer.js'
 import { TILE_SIZE, EditTool } from '../types.js'
-import { CAMERA_FOLLOW_LERP, CAMERA_FOLLOW_SNAP_THRESHOLD, ZOOM_MIN, ZOOM_MAX } from '../../constants.js'
+import { CAMERA_FOLLOW_LERP, CAMERA_FOLLOW_SNAP_THRESHOLD, ZOOM_MIN, ZOOM_MAX, ZOOM_SCROLL_THRESHOLD } from '../../constants.js'
 import { getCatalogEntry, isRotatable } from '../layout/furnitureCatalog.js'
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js'
 import { vscode } from '../../vscodeApi.js'
@@ -40,6 +40,8 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
   const rotateButtonBoundsRef = useRef<RotateButtonBounds | null>(null)
   // Right-click erase dragging
   const isEraseDraggingRef = useRef(false)
+  // Zoom scroll accumulator for trackpad pinch sensitivity
+  const zoomAccumulatorRef = useRef(0)
 
   // Resize canvas backing store to device pixels (no DPR transform on ctx)
   const resizeCanvas = useCallback(() => {
@@ -604,18 +606,32 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     }
   }, [isEditMode])
 
-  // Ctrl+wheel to zoom in/out by integer steps
+  // Wheel: Ctrl+wheel to zoom, plain wheel/trackpad to pan
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return
       e.preventDefault()
-      const delta = e.deltaY < 0 ? 1 : -1
-      const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom + delta))
-      if (newZoom !== zoom) {
-        onZoomChange(newZoom)
+      if (e.ctrlKey || e.metaKey) {
+        // Accumulate scroll delta, step zoom when threshold crossed
+        zoomAccumulatorRef.current += e.deltaY
+        if (Math.abs(zoomAccumulatorRef.current) >= ZOOM_SCROLL_THRESHOLD) {
+          const delta = zoomAccumulatorRef.current < 0 ? 1 : -1
+          zoomAccumulatorRef.current = 0
+          const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom + delta))
+          if (newZoom !== zoom) {
+            onZoomChange(newZoom)
+          }
+        }
+      } else {
+        // Pan via trackpad two-finger scroll or mouse wheel
+        const dpr = window.devicePixelRatio || 1
+        officeState.cameraFollowId = null
+        panRef.current = {
+          x: panRef.current.x - e.deltaX * dpr,
+          y: panRef.current.y - e.deltaY * dpr,
+        }
       }
     },
-    [zoom, onZoomChange],
+    [zoom, onZoomChange, officeState, panRef],
   )
 
   // Prevent default middle-click browser behavior (auto-scroll)
