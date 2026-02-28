@@ -197,6 +197,7 @@ function adoptTerminalForFile(
 		isWaiting: false,
 		permissionSent: false,
 		hadToolsInTurn: false,
+		lastResponse: '',
 	};
 
 	agents.set(id, agent);

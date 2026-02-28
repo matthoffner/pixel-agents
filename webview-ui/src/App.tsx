@@ -121,7 +121,7 @@ function App() {
 
   const isEditDirty = useCallback(() => editor.isEditMode && editor.isDirty, [editor.isEditMode, editor.isDirty])
 
-  const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
+  const { agents, selectedAgent, agentTools, agentStatuses, agentResponses, subagentTools, subagentCharacters, layoutReady, loadedAssets } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
 
@@ -148,6 +148,10 @@ function App() {
 
   const handleCloseAgent = useCallback((id: number) => {
     vscode.postMessage({ type: 'closeAgent', id })
+  }, [])
+
+  const handleSendReply = useCallback((id: number, text: string) => {
+    vscode.postMessage({ type: 'sendReply', id, text })
   }, [])
 
   const handleClick = useCallback((agentId: number) => {
@@ -288,11 +292,13 @@ function App() {
         officeState={officeState}
         agents={agents}
         agentTools={agentTools}
+        agentResponses={agentResponses}
         subagentCharacters={subagentCharacters}
         containerRef={containerRef}
         zoom={editor.zoom}
         panRef={editor.panRef}
         onCloseAgent={handleCloseAgent}
+        onSendReply={handleSendReply}
       />
 
       {isDebugMode && (

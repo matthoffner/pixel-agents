@@ -1,10 +1,44 @@
-# Pixel Agents
+# Pixel Agents (Web + Terminal)
 
-A VS Code extension that turns your AI coding agents into animated pixel art characters in a virtual office.
+> Fork of [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents) — a VS Code extension that turns AI coding agents into animated pixel art characters in a virtual office.
 
-Each Claude Code terminal you open spawns a character that walks around, sits at desks, and visually reflects what the agent is doing — typing when writing code, reading when searching files, waiting when it needs your attention.
+This fork adds a **standalone web version** with an integrated terminal. Instead of requiring VS Code, it runs as a Next.js app with a Node.js backend that manages Claude Code sessions via `node-pty` and streams output to an xterm.js terminal in the browser over WebSocket.
 
-This is the source code for the free [Pixel Agents extension for VS Code](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents) — you can install it directly from the marketplace with the full furniture catalog included.
+Each Claude Code session you open spawns a character that walks around, sits at desks, and visually reflects what the agent is doing — typing when writing code, reading when searching files, waiting when it needs your attention.
+
+## Standalone Web Version
+
+The `standalone/` directory contains the web version:
+
+- **Next.js frontend** — the same pixel art office UI, running in any browser
+- **Integrated terminal** — xterm.js terminal connected to Claude Code via `node-pty` and WebSocket
+- **Custom server** — `server.ts` handles asset loading, layout persistence, agent lifecycle, and PTY management
+- **No VS Code required** — just `npm run dev` and open your browser
+
+### Quick Start (Standalone)
+
+```bash
+cd standalone
+npm install
+npm run dev
+```
+
+Then open `http://localhost:3000`. Click **+ Agent** to spawn a Claude Code terminal and its character.
+
+### How It Differs from the VS Code Extension
+
+| | VS Code Extension | Standalone Web |
+|---|---|---|
+| Runtime | VS Code extension host | Next.js + Node.js server |
+| Terminal | VS Code integrated terminal | xterm.js over WebSocket (`node-pty`) |
+| Communication | `postMessage` (webview API) | WebSocket |
+| Install | VS Code Marketplace | `npm install && npm run dev` |
+
+---
+
+## Original VS Code Extension
+
+The original project is a VS Code extension — you can install it from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pablodelucca.pixel-agents).
 
 
 ![Pixel Agents screenshot](webview-ui/public/Screenshot.jpg)
@@ -36,7 +70,7 @@ If you just want to use Pixel Agents, the easiest way is to download the [VS Cod
 ### Install from source
 
 ```bash
-git clone https://github.com/pablodelucca/pixel-agents.git
+git clone https://github.com/matthoffner/pixel-agents.git
 cd pixel-agents
 npm install
 cd webview-ui && npm install && cd ..
@@ -117,9 +151,9 @@ See [CONTRIBUTORS.md](CONTRIBUTORS.md) for instructions on how to contribute to 
 
 Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before participating.
 
-## Supporting the Project
+## Upstream
 
-If you find Pixel Agents useful, consider supporting its development:
+This is a fork of [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents). Consider supporting the original author:
 
 <a href="https://github.com/sponsors/pablodelucca">
   <img src="https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?logo=github" alt="GitHub Sponsors">

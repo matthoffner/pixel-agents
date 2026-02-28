@@ -10,6 +10,9 @@ export const TEXT_IDLE_DELAY_MS = 5000;
 export const BASH_COMMAND_DISPLAY_MAX_LENGTH = 30;
 export const TASK_DESCRIPTION_DISPLAY_MAX_LENGTH = 40;
 
+// ── Agent Response ──────────────────────────────────────────
+export const AGENT_RESPONSE_MAX_LENGTH = 500;
+
 // ── PNG / Asset Parsing ─────────────────────────────────────
 export const PNG_ALPHA_THRESHOLD = 128;
 export const WALL_PIECE_WIDTH = 16;

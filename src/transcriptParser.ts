@@ -13,6 +13,7 @@ import {
 	TEXT_IDLE_DELAY_MS,
 	BASH_COMMAND_DISPLAY_MAX_LENGTH,
 	TASK_DESCRIPTION_DISPLAY_MAX_LENGTH,
+	AGENT_RESPONSE_MAX_LENGTH,
 } from './constants.js';
 
 export const PERMISSION_EXEMPT_TOOLS = new Set(['Task', 'AskUserQuestion']);
@@ -58,7 +59,29 @@ export function processTranscriptLine(
 		if (record.type === 'assistant' && Array.isArray(record.message?.content)) {
 			const blocks = record.message.content as Array<{
 				type: string; id?: string; name?: string; input?: Record<string, unknown>;
+				text?: string;
 			}>;
+
+			// Extract assistant text response
+			const textParts: string[] = [];
+			for (const block of blocks) {
+				if (block.type === 'text' && typeof block.text === 'string') {
+					textParts.push(block.text);
+				}
+			}
+			if (textParts.length > 0) {
+				const fullText = textParts.join('\n');
+				const truncated = fullText.length > AGENT_RESPONSE_MAX_LENGTH
+					? fullText.slice(0, AGENT_RESPONSE_MAX_LENGTH) + '\u2026'
+					: fullText;
+				agent.lastResponse = truncated;
+				webview?.postMessage({
+					type: 'agentResponse',
+					id: agentId,
+					text: truncated,
+				});
+			}
+
 			const hasToolUse = blocks.some(b => b.type === 'tool_use');
 
 			if (hasToolUse) {

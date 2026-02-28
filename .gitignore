@@ -6,4 +6,5 @@ node_modules
 .claude/
 /logs
 /sprites-export
-.env
+.env.DS_Store
+.playwright-mcp/

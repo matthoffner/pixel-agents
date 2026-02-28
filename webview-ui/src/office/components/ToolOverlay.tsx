@@ -1,19 +1,27 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { ToolActivity } from '../types.js'
 import type { OfficeState } from '../engine/officeState.js'
 import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js'
 import { TILE_SIZE, CharacterState } from '../types.js'
-import { TOOL_OVERLAY_VERTICAL_OFFSET, CHARACTER_SITTING_OFFSET_PX } from '../../constants.js'
+import {
+  TOOL_OVERLAY_VERTICAL_OFFSET,
+  CHARACTER_SITTING_OFFSET_PX,
+  RESPONSE_TOOLTIP_MAX_LINES,
+  RESPONSE_TOOLTIP_MAX_WIDTH,
+  REPLY_INPUT_WIDTH,
+} from '../../constants.js'
 
 interface ToolOverlayProps {
   officeState: OfficeState
   agents: number[]
   agentTools: Record<number, ToolActivity[]>
+  agentResponses: Record<number, string>
   subagentCharacters: SubagentCharacter[]
   containerRef: React.RefObject<HTMLDivElement | null>
   zoom: number
   panRef: React.RefObject<{ x: number; y: number }>
   onCloseAgent: (id: number) => void
+  onSendReply: (id: number, text: string) => void
 }
 
 /** Derive a short human-readable activity string from tools/status */
@@ -44,11 +52,13 @@ export function ToolOverlay({
   officeState,
   agents,
   agentTools,
+  agentResponses,
   subagentCharacters,
   containerRef,
   zoom,
   panRef,
   onCloseAgent,
+  onSendReply,
 }: ToolOverlayProps) {
   const [, setTick] = useState(0)
   useEffect(() => {
@@ -60,6 +70,24 @@ export function ToolOverlay({
     rafId = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(rafId)
   }, [])
+
+  const [replyText, setReplyText] = useState('')
+  const [replyAgentId, setReplyAgentId] = useState<number | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const selectedId = officeState.selectedAgentId
+
+  // Reset reply text when selection changes
+  useEffect(() => {
+    setReplyText('')
+    setReplyAgentId(selectedId)
+    if (selectedId !== null) {
+      setTimeout(() => inputRef.current?.focus(), 100)
+    }
+  }, [selectedId])
+
+  // Suppress unused var warning — replyAgentId tracks which agent the input belongs to
+  void replyAgentId
 
   const el = containerRef.current
   if (!el) return null
@@ -73,7 +101,6 @@ export function ToolOverlay({
   const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x)
   const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y)
 
-  const selectedId = officeState.selectedAgentId
   const hoveredId = officeState.hoveredAgentId
 
   // All character IDs
@@ -124,6 +151,9 @@ export function ToolOverlay({
           dotColor = 'var(--pixel-status-active)'
         }
 
+        // Response text (only for non-sub agents)
+        const responseText = !isSub ? agentResponses[id] || '' : ''
+
         return (
           <div
             key={id}
@@ -139,6 +169,37 @@ export function ToolOverlay({
               zIndex: isSelected ? 'var(--pixel-overlay-selected-z)' : 'var(--pixel-overlay-z)',
             }}
           >
+            {/* Response tooltip */}
+            {responseText && (
+              <div
+                style={{
+                  background: 'var(--pixel-bg)',
+                  border: '2px solid var(--pixel-border)',
+                  borderRadius: 0,
+                  padding: '4px 8px',
+                  boxShadow: 'var(--pixel-shadow)',
+                  maxWidth: RESPONSE_TOOLTIP_MAX_WIDTH,
+                  marginBottom: 4,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '20px',
+                    color: 'var(--pixel-text-dim)',
+                    display: '-webkit-box',
+                    WebkitLineClamp: RESPONSE_TOOLTIP_MAX_LINES,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    wordBreak: 'break-word',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {responseText}
+                </span>
+              </div>
+            )}
+
+            {/* Status bar */}
             <div
               style={{
                 display: 'flex',
@@ -207,6 +268,66 @@ export function ToolOverlay({
                 </button>
               )}
             </div>
+
+            {/* Reply input (selected non-sub agents only) */}
+            {isSelected && !isSub && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (replyText.trim()) {
+                    onSendReply(id, replyText)
+                    setReplyText('')
+                  }
+                }}
+                style={{
+                  display: 'flex',
+                  marginTop: 4,
+                }}
+              >
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setReplyText('')
+                      e.currentTarget.blur()
+                    }
+                    e.stopPropagation()
+                  }}
+                  placeholder="Type a reply..."
+                  style={{
+                    flex: 1,
+                    width: REPLY_INPUT_WIDTH,
+                    background: 'var(--pixel-input-bg)',
+                    border: '2px solid var(--pixel-border)',
+                    borderRadius: 0,
+                    color: 'var(--vscode-foreground)',
+                    fontSize: '20px',
+                    padding: '3px 6px',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    background: 'var(--pixel-accent)',
+                    border: '2px solid var(--pixel-border)',
+                    borderLeft: 'none',
+                    borderRadius: 0,
+                    color: '#fff',
+                    fontSize: '20px',
+                    padding: '3px 8px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  &#x23CE;
+                </button>
+              </form>
+            )}
           </div>
         )
       })}

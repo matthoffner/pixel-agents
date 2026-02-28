@@ -46,6 +46,9 @@
   --pixel-status-permission: var(--vscode-charts-yellow, #cca700);
   --pixel-status-active: var(--vscode-charts-blue, #3794ff);
 
+  /* Input */
+  --pixel-input-bg: #2a2a3e;
+
   /* ToolOverlay z-index layers */
   --pixel-overlay-z: 100;
   --pixel-overlay-selected-z: 110;

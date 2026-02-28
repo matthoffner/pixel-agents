@@ -9,6 +9,16 @@ import {
   CHAIR_SPRITE,
   PC_SPRITE,
   LAMP_SPRITE,
+  TV_BIG_SPRITE,
+  MUG_SPRITE,
+  SERVER_RACK_SPRITE,
+  CLOCK_SPRITE,
+  COUCH_SPRITE,
+  TRASH_CAN_SPRITE,
+  PAINTING_SPRITE,
+  WHITEBOARD_STANDING_SPRITE,
+  MICROWAVE_SPRITE,
+  NITRO_TAP_SPRITE,
 } from '../sprites/spriteData.js'
 
 export interface LoadedAssetData {
@@ -47,6 +57,16 @@ export const FURNITURE_CATALOG: CatalogEntryWithCategory[] = [
   { type: FurnitureType.CHAIR,      label: 'Chair',      footprintW: 1, footprintH: 1, sprite: CHAIR_SPRITE,        isDesk: false, category: 'chairs' },
   { type: FurnitureType.PC,         label: 'PC',         footprintW: 1, footprintH: 1, sprite: PC_SPRITE,           isDesk: false, category: 'electronics' },
   { type: FurnitureType.LAMP,       label: 'Lamp',       footprintW: 1, footprintH: 1, sprite: LAMP_SPRITE,         isDesk: false, category: 'decor' },
+  { type: FurnitureType.TV_BIG,    label: 'Big TV',     footprintW: 2, footprintH: 2, sprite: TV_BIG_SPRITE,       isDesk: false, category: 'electronics' },
+  { type: FurnitureType.MUG,       label: 'Coffee Mug', footprintW: 1, footprintH: 1, sprite: MUG_SPRITE,          isDesk: false, category: 'decor', canPlaceOnSurfaces: true },
+  { type: FurnitureType.SERVER_RACK, label: 'Server Rack', footprintW: 1, footprintH: 2, sprite: SERVER_RACK_SPRITE, isDesk: false, category: 'electronics' },
+  { type: FurnitureType.CLOCK,     label: 'Clock',      footprintW: 1, footprintH: 1, sprite: CLOCK_SPRITE,        isDesk: false, category: 'wall', canPlaceOnWalls: true },
+  { type: FurnitureType.COUCH,     label: 'Couch',      footprintW: 2, footprintH: 1, sprite: COUCH_SPRITE,        isDesk: false, category: 'chairs' },
+  { type: FurnitureType.TRASH_CAN, label: 'Trash Can',  footprintW: 1, footprintH: 1, sprite: TRASH_CAN_SPRITE,    isDesk: false, category: 'misc' },
+  { type: FurnitureType.PAINTING,  label: 'Painting',   footprintW: 1, footprintH: 1, sprite: PAINTING_SPRITE,     isDesk: false, category: 'wall', canPlaceOnWalls: true },
+  { type: FurnitureType.WHITEBOARD_STANDING, label: 'Standing Whiteboard', footprintW: 1, footprintH: 2, sprite: WHITEBOARD_STANDING_SPRITE, isDesk: false, category: 'decor' },
+  { type: FurnitureType.MICROWAVE, label: 'Microwave',  footprintW: 1, footprintH: 1, sprite: MICROWAVE_SPRITE,    isDesk: false, category: 'electronics', canPlaceOnSurfaces: true },
+  { type: FurnitureType.NITRO_TAP, label: 'Nitro Cold Brew', footprintW: 1, footprintH: 2, sprite: NITRO_TAP_SPRITE, isDesk: false, category: 'misc' },
 
 ]
 
